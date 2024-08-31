@@ -1,12 +1,13 @@
 import { Router } from "express";
 import { openDb } from "./database";
 import { v4 as uuidv4 } from "uuid";
+import { getMeasureValue } from "./geminiService";
 
 const router = Router();
 
 /**
  * POST - Endpoint /upload
- */
+ **/
 router.post("/upload", async (req, res) => {
   const { image, customer_code, measure_datetime, measure_type } = req.body;
 
@@ -18,7 +19,7 @@ router.post("/upload", async (req, res) => {
     });
   }
 
-  // Verificação
+  // Verificação de duplicatas no banco de dados
   const db = await openDb();
   const existingReading = await db.get(
     `SELECT * FROM readings WHERE customer_code = ? AND measure_type = ? AND strftime('%Y-%m', measure_datetime) = strftime('%Y-%m', ?)`,
@@ -32,23 +33,30 @@ router.post("/upload", async (req, res) => {
     });
   }
 
-  // API Google Gemini
-  const measure_value = 1234;
+  // Chamada à API Gemini
+  try {
+    // Gerar GUID para leitura e salvar no banco de dados
+    const measure_uuid = uuidv4();
+    const image_url = `http://localhost:3000/src/images/${measure_uuid}`;
 
-  // Gerar GUID para leitura e salvar no banco de dados
-  const measure_uuid = uuidv4();
-  const image_url = `https://temp-images-server.com/${measure_uuid}`;
+    const measure_value = await getMeasureValue(image, measure_uuid);
 
-  await db.run(
-    `INSERT INTO readings (measure_uuid, customer_code, measure_datetime, measure_type, has_confirmed, image_url) VALUES (?, ?, ?, ?, ?, ?)`,
-    [measure_uuid, customer_code, measure_datetime, measure_type, false, image_url]
-  );
+    await db.run(
+      `INSERT INTO readings (measure_uuid, customer_code, measure_datetime, measure_type, has_confirmed, image_url) VALUES (?, ?, ?, ?, ?, ?)`,
+      [measure_uuid, customer_code, measure_datetime, measure_type, false, image_url]
+    );
 
-  res.status(200).json({
-    image_url,
-    measure_value,
-    measure_uuid,
-  });
+    res.status(200).json({
+      image_url,
+      measure_value,
+      measure_uuid,
+    });
+  } catch (error) {
+    res.status(500).json({
+      error_code: "GEMINI_API_ERROR",
+      error_description: "Erro ao processar a imagem com a API Google Gemini.",
+    });
+  }
 });
 
 /**
@@ -145,12 +153,12 @@ router.get("/:customer_code/list", async (req, res) => {
 
 /**
  * GET - Endpoint /readings
- */
+ 
 router.get("/readings", async (req, res) => {
   const db = await openDb();
   const readings = await db.all("SELECT * FROM readings");
   console.log("Retornando [ " + readings.length + " ] dados ");
   res.json(readings);
-});
+});*/
 
 export default router;
