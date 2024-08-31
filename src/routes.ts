@@ -152,13 +152,13 @@ router.get("/:customer_code/list", async (req, res) => {
 });
 
 /**
- * GET - Endpoint /readings
- 
+ * GET ALL - Endpoint /readings
+ */
 router.get("/readings", async (req, res) => {
   const db = await openDb();
   const readings = await db.all("SELECT * FROM readings");
   console.log("Retornando [ " + readings.length + " ] dados ");
   res.json(readings);
-});*/
+});
 
 export default router;
